@@ -19,7 +19,7 @@ camera.position.z = 100;
 
 const controls = new OrbitControls(camera, renderer.domElement);
 
-const gridSize = 70;
+const gridSize = 65;
 const cellularAutomata = new CellularAutomata(gridSize, gridSize, gridSize);
 cellularAutomata.addCellsTo(scene);
 

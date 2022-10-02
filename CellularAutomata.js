@@ -2,38 +2,13 @@ import * as THREE from "three";
 
 const dummy = new THREE.Object3D();
 const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-const boxMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-        color1: { value: new THREE.Color("red") },
-        color2: { value: new THREE.Color("purple") },
-    },
-    vertexShader: `
-        varying vec2 vUv;
-
-        void main() {
-            vUv = uv;
-            // account for the fact this is an instance and not a single mesh
-            vec4 mvPosition = instanceMatrix * vec4(position, 1.0);
-            gl_Position = projectionMatrix * modelViewMatrix * mvPosition;
-        }
-    `,
-    fragmentShader: `
-        uniform vec3 color1;
-        uniform vec3 color2;
-        
-        varying vec2 vUv;
-
-        void main() {
-            gl_FragColor = vec4(mix(color1, color2, vUv.y), 1.0);
-        }
-    `,
-});
+const boxMaterial = new THREE.MeshNormalMaterial();
 
 class Cell {
     constructor(state = 0, maxLife = 5) {
         this.state = state;
         this.prevState = state;
-        this.life = 0;
+        this.life = state === 1 ? maxLife : 0;
         this.maxLife = maxLife;
         this.visible = true;
         this.update();
@@ -128,13 +103,13 @@ export default class CellularAutomata {
                         nY = ((j < 0 ? j + this.height : j) + y) % this.height,
                         nZ = ((k < 0 ? k + this.depth : k) + z) % this.depth;
 
-                    neighbors += this.state[nX][nY][nZ].prevState;
+                    neighbors += this.state[nX][nY][nZ].prevState; //();
                 }
             }
         }
 
         // remove current cell from neighbors
-        neighbors -= this.state[x][y][z].prevState;
+        neighbors -= this.state[x][y][z].prevState; //();
 
         return neighbors;
     }
@@ -146,12 +121,12 @@ export default class CellularAutomata {
             const neighbors = this.getNeighbors(x, y, z);
 
             // The first 4 indicates that a state 1 cell survives if it has 4 neighbor cells.
-            if (cell.prevState === 1 && neighbors === 4) {
+            if (cell.getState() === 1 && neighbors === 4) {
                 cell.setState(1);
             }
 
             // The second 4 indicates that a cell is born in an empty location if it has 4 neighbors.
-            if (cell.prevState === 0 && neighbors === 4) {
+            if (cell.getState() === 0 && neighbors === 4) {
                 cell.setState(1);
             }
 
@@ -182,7 +157,7 @@ export default class CellularAutomata {
     initializeState(useRandomStates = true) {
         const createArray = (length) => new Array(length).fill(0);
         const randomState = () =>
-            useRandomStates ? (Math.random() > 0.97 ? 1 : 0) : 0;
+            useRandomStates ? (Math.random() > 0.95 ? 1 : 0) : 0;
 
         return createArray(this.width).map(() =>
             createArray(this.height).map(() =>
