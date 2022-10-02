@@ -5,42 +5,26 @@ const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
 const boxMaterial = new THREE.MeshNormalMaterial();
 
 class Cell {
-    constructor(state = 0, maxLife = 5) {
+    constructor(state = 0, maxLife = 3) {
         this.state = state;
         this.prevState = state;
         this.life = state === 1 ? maxLife : 0;
         this.maxLife = maxLife;
-        this.visible = true;
         this.update();
     }
 
-    update() {
-        // decrease life if you are dead
-        if (this.state === 0) {
-            this.life = Math.max(0, this.life - 1);
-
-            // if you are dead and have no life, hide yourself
-            if (this.life == 0) {
-                this.visible = false;
-            }
-        }
+    get visible() {
+        return this.life > 0;
     }
 
-    getState() {
-        if (this.life > 0) {
-            return this.state;
-        }
-
-        return 0;
+    update() {
+        this.life--;
     }
 
     setState(state) {
-        this.prevState = this.state;
         this.state = state;
-
-        if (state === 1 && this.life === 0 && this.prevState === 0) {
+        if (state === 1) {
             this.life = this.maxLife;
-            this.visible = true;
         }
     }
 }
@@ -54,14 +38,23 @@ export default class CellularAutomata {
     }
 
     traverseState(cb) {
-        for (let x = 0; x < this.width; x++) {
-            for (let y = 0; y < this.height; y++) {
-                for (let z = 0; z < this.depth; z++) {
+        // restrain grid
+        for (let x = 1; x < this.width - 1; x++) {
+            for (let y = 1; y < this.height - 1; y++) {
+                for (let z = 1; z < this.depth - 1; z++) {
                     const cell = this.state[x][y][z];
                     cb(cell, x, y, z);
                 }
             }
         }
+        // for (let x = 0; x < this.width ; x++) {
+        //     for (let y = 0; y < this.height ; y++) {
+        //         for (let z = 0; z < this.depth ; z++) {
+        //             const cell = this.state[x][y][z];
+        //             cb(cell, x, y, z);
+        //         }
+        //     }
+        // }
     }
 
     offsetCoordinates(x, y, z) {
@@ -103,30 +96,34 @@ export default class CellularAutomata {
                         nY = ((j < 0 ? j + this.height : j) + y) % this.height,
                         nZ = ((k < 0 ? k + this.depth : k) + z) % this.depth;
 
-                    neighbors += this.state[nX][nY][nZ].prevState; //();
+                    neighbors += this.state[nX][nY][nZ].prevState;
                 }
             }
         }
 
         // remove current cell from neighbors
-        neighbors -= this.state[x][y][z].prevState; //();
+        neighbors -= this.state[x][y][z].prevState;
 
         return neighbors;
     }
 
     update() {
-        let i = 0;
+        // save all previous states
+        this.traverseState((cell) => {
+            cell.prevState = cell.state;
+        });
 
+        let i = 0;
         this.traverseState((cell, x, y, z) => {
             const neighbors = this.getNeighbors(x, y, z);
 
-            // The first 4 indicates that a state 1 cell survives if it has 4 neighbor cells.
-            if (cell.getState() === 1 && neighbors === 4) {
+            // // The first 4 indicates that a state 1 cell survives if it has 4 neighbor cells.
+            if (cell.prevState === 1 && neighbors === 4) {
                 cell.setState(1);
             }
 
             // The second 4 indicates that a cell is born in an empty location if it has 4 neighbors.
-            if (cell.getState() === 0 && neighbors === 4) {
+            if (cell.prevState === 0 && neighbors === 4) {
                 cell.setState(1);
             }
 
@@ -134,9 +131,6 @@ export default class CellularAutomata {
             else {
                 cell.setState(0);
             }
-
-            // The 5 means each cell has 5 total states it can be in (state 4 for newly born which then fades to state 1 and then state 0 for no cell)
-
             cell.update();
 
             // update visibility by setting scale
@@ -148,16 +142,21 @@ export default class CellularAutomata {
             }
 
             dummy.updateMatrix();
+            // this.mesh.setColorAt(
+            //     i,
+            //     color1.clone().lerp(color2, cell.life / cell.maxLife)
+            // );
             this.mesh.setMatrixAt(i++, dummy.matrix);
         });
 
+        // this.mesh.instanceColor.needsUpdate = true;
         this.mesh.instanceMatrix.needsUpdate = true;
     }
 
     initializeState(useRandomStates = true) {
         const createArray = (length) => new Array(length).fill(0);
         const randomState = () =>
-            useRandomStates ? (Math.random() > 0.95 ? 1 : 0) : 0;
+            useRandomStates ? (Math.random() > 0.99 ? 1 : 0) : 0;
 
         return createArray(this.width).map(() =>
             createArray(this.height).map(() =>
